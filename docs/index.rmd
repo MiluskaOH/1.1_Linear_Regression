@@ -1,0 +1,245 @@
+---
+title: "Regression Adelie Penguins"
+date: "2024-02-01"
+output: html_document
+---
+
+# Load necessary packages and penguins dataset
+
+```{r}
+if (!require("palmerpenguins")) install.packages("palmerpenguins")
+library(palmerpenguins)
+
+# Load the penguins dataset
+data("penguins")
+str(penguins)
+
+# Check for missing values
+sum(is.na(penguins))
+```
+
+# Remove rows with missing values
+
+```{r}
+# Remove rows with missing values
+penguins <- na.omit(penguins)
+
+head(penguins)
+```
+```{r}
+# Select only the species "Adelie"
+penguins <- subset(penguins, species == "Adelie")
+
+```
+# (1) Estimate the correlation between x and y
+
+```{r}
+correlation <- cor(penguins$bill_length_mm, penguins$body_mass_g)
+
+# Print the correlation
+cat("Correlation between bill_length_mm and body_mass_g:", correlation, "\n")
+```
+
+# Linear Regression and Visualization
+
+```{r}
+library(ggplot2)
+
+# Fit the linear model
+model <- lm(body_mass_g ~ bill_length_mm, data = penguins)
+
+# Extract coefficients
+a_hat <- coef(model)[1]
+b_hat <- coef(model)[2]
+
+# Create a scatter plot with a linear regression line, confidence intervals, and regression formula
+ggplot(penguins, aes(x = bill_length_mm, y = body_mass_g)) +
+  geom_point(shape=15, alpha=0.7,size=3, color="blue") +
+  geom_smooth(method = "lm", se = TRUE, color = "red") +
+  geom_text(aes(x = max(bill_length_mm), y = max(body_mass_g), 
+                label = paste("y =", round(a_hat, 2), "+", round(b_hat, 2), "* x")), 
+            hjust = 1, vjust = 1, color = "red") +
+  labs(title = "Scatter Plot with Linear Regression Line, Confidence Intervals, and Regression Formula",
+       x = "Bill Length (mm)",
+       y = "Body Mass (g)") +
+  theme_minimal()+
+  theme(plot.title = element_text(size = 10))  # Set the size of the title
+```
+
+
+# (2) Find the estimators of a and b, and get the fitted linear equation
+
+```{r}
+# Create a data frame
+data <- data.frame(x = penguins$bill_length_mm, y = penguins$body_mass_g)
+
+# Fit the linear model
+model <- lm(y ~ x, data = data)
+
+# Obtain estimators a and b
+a_hat <- coef(model)[1]
+b_hat <- coef(model)[2]
+
+# Print the estimators
+cat("Estimator of a (Intercept):", a_hat, "\n")
+cat("Estimator of b (Slope):", b_hat, "\n")
+
+# Get the fitted linear equation
+fitted_equation <- paste("y_hat =", round(a_hat, 4), "+", round(b_hat, 4), "* x")
+
+# Print the fitted linear equation
+cat("Fitted linear equation:\n", fitted_equation, "\n")
+```
+
+# (3) Find the estimator (sigma^2_hat) for the population variance (sigma^2)
+
+```{r}
+# Calculate residuals
+residuals <- residuals(model)
+
+# Calculate the estimator for population variance
+population_var_estimator <- sum(residuals^2) / (length(residuals) - 2)
+
+# Print the estimator for population variance
+cat("Estimator for Population Variance (sigma^2):", population_var_estimator, "\n")
+```
+
+# (4) What is the distribution of b_hat?
+
+```{r}
+# Calculate the sum of squared differences between each x_i and the mean of x
+sum_squares <- sum((data$x - mean(data$x))^2)
+
+# Print the sum of squares
+cat("Sum of Squares:", sum_squares, "\n")
+```
+
+# (5) Assume sigma is known with sigma^2=0.8. Test the hypothesis H0: b=0, with significance level alpha=0.05. Find the p-value.
+
+```{r}
+# Extract the estimate and standard error of the slope
+b_hat <- coef(model)[2]
+se_b_hat <- summary(model)$coefficients[2, 2]
+
+# Assume sigma is known with sigma^2 = 0.8
+sigma_squared <- 0.8
+
+# Calculate the test statistic
+z_stat <- b_hat / (sqrt(sigma_squared) * se_b_hat)
+
+# Calculate the p-value
+p_value <- 2 * pnorm(-abs(z_stat))
+
+# Print the test statistic and p-value
+cat("Test Statistic (z):", z_stat, "\n")
+cat("P-value:", p_value, "\n")
+```
+
+# (6) Now test the hypothesis H0 : b=0 with unknown sigma and find the value of the t-statistic (you are given that (t = 3.18 for p=0.05 and df=3))
+
+```{r}
+# Extract the estimate and standard error of the slope
+b_hat <- coef(model)[2]
+se_b_hat <- summary(model)$coefficients[2, 2]
+
+# Degrees of freedom
+df <- length(data$x) - 2  # df = n - 2 for simple linear regression
+
+# Given t-value for alpha = 0.05 and df = 3
+given_t_value <- 3.18
+
+# Calculate the test statistic
+t_stat <- b_hat / se_b_hat
+
+# Calculate the p-value
+p_value <- 2 * pt(-abs(t_stat), df)
+
+# Print the calculated t-statistic and p-value
+cat("Calculated t-statistic:", t_stat, "\n")
+cat("P-value:", p_value, "\n")
+```
+
+# (7) Compute the variance of the first residual (e1 = y1 - ŷ1), where ŷ1 is the fitted value for the first observation. Sigma is unknown.
+
+```{r}
+# Extract residuals and fitted values
+residuals <- residuals(model)
+fitted_values <- predict(model)
+leverage <- hatvalues(model)
+
+# Calculate the variance of the residuals
+mse <- sum(residuals^2) / (length(residuals) - 2)  # Mean Squared Error (MSE)
+
+# Calculate the variance of the first residual
+var_e1 <- mse * (1 - 1/length(residuals) - ((data$x[1] - mean(data$x))^2) / sum((data$x - mean(data$x))^2))
+
+# Print the variance of the first residual
+cat("Variance of the first residual (e1):", var_e1, "\n")
+```
+
+## (8) Compute the studentized residual of the first observation.
+
+```{r}
+# Calculate the estimated variance of the error term (MSE)
+mse <- sum(residuals^2) / (length(residuals) - 2)
+
+# Calculate the studentized residual for the first observation
+studentized_residual_1 <- residuals[1] / sqrt(mse * (1 - leverage[1]))
+
+# Print the studentized residual for the first observation
+cat("Studentized Residual for the first observation:", studentized_residual_1, "\n")
+```
+
+# (9) Compute the influence of the observations and find the observation i with
+
+ the largest hii
+
+```{r}
+# Extract leverages
+leverage <- hatvalues(model)
+
+# Find the observation with the largest leverage
+max_leverage_index <- which.max(leverage)
+max_leverage_value <- leverage[max_leverage_index]
+
+# Print the observation index and its leverage
+cat("Observation with the largest leverage (h_ii):", max_leverage_index, "\n")
+cat("Largest leverage value (h_ii):", max_leverage_value, "\n")
+```
+
+# (10) Suppose we have a new data point x=44 and the aim is to predict the corresponding y outcome. Find the 95% confidence interval (alpha=0.05) for a+bx (assume sigma is known with sigma^2 =0.8).
+
+```{r}
+# New data point
+new_x <- 44
+
+# Calculate the standard error of the prediction
+se_prediction <- sqrt(sigma_squared * (1/length(data$x) + (new_x - mean(data$x))^2 / sum((data$x - mean(data$x))^2)))
+
+# Critical value for a 95% confidence interval
+z <- qnorm(1 - 0.05/2)
+
+# Calculate the predicted value and confidence interval
+predicted_value <- a_hat + b_hat * new_x
+lower_bound <- predicted_value - z * se_prediction
+upper_bound <- predicted_value + z * se_prediction
+
+# Print the results
+cat("Predicted Value:", predicted_value, "\n")
+cat("95% Confidence Interval: [", lower_bound, ",", upper_bound, "]\n")
+
+# Create a scatter plot with a linear regression line, confidence intervals, regression formula, and new data point
+ggplot(penguins, aes(x = bill_length_mm, y = body_mass_g)) +
+  geom_point(shape=15, alpha=0.7,size=3, color="blue") +
+  geom_smooth(method = "lm", se = TRUE, color = "grey") +
+  geom_text(aes(x = max(bill_length_mm), y = max(body_mass_g), 
+                label = paste("y =", round(a_hat, 2), "+", round(b_hat, 2), "* x")), 
+            hjust = 1, vjust = 1, color = "red") +
+  geom_point(aes(x = new_x, y = predicted_value), color = "red", size = 6, shape=17) +
+  geom_errorbar(aes(x = new_x, ymin = lower_bound, ymax = upper_bound), color = "green", width = 0.2) +
+  labs(title = "Scatter Plot with Linear Regression Line, CI, Regression Formula, and Predicted value",
+       x = "Bill Length (mm)",
+       y = "Body Mass (g)") +
+  theme_minimal()+
+  theme(plot.title = element_text(size = 10))
+```
